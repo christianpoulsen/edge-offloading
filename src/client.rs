@@ -13,7 +13,7 @@ impl<'client> Client<'client> {
 
     pub fn new<'a>() -> Client<'a> {
 
-        let msg = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit.!";
+        let msg = b"START: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit.! :END";
 
         let mut size_buffer: [u8; 8] = [0; 8];
         
@@ -49,21 +49,23 @@ impl<'client> Client<'client> {
                 stream.write_all(self.buffer.as_mut()).unwrap();
                 println!("Sent message, awaiting reply...");
 
-                let mut data: Vec<u8> = Vec::new();
-                match stream.read_to_end(&mut data) {
-                    Ok(_) => {
-                        let test = data.as_slice();
-                        let equal = test.eq_ignore_ascii_case(self.msg);
-                        if equal {
-                            println!("Reply is ok!");
-                        } else {
-                            let text = from_utf8(&data).unwrap();
-                            println!("Unexpected reply: {}", text);
-                        }
+                let mut incoming_msg: Vec<u8> = Vec::new();
+                let mut data = [0; 512];
+                while match stream.read(&mut data) {
+                    Ok(size) => {
+                        incoming_msg.extend_from_slice(&data[0..size]);
+                        if size < 512 { false } else { true }
                     },
                     Err(e) => {
                         println!("Failed to receive data: {}", e);
+                        false
                     }
+                } { }
+                if incoming_msg.as_slice().eq_ignore_ascii_case(&self.msg) {
+                    println!("Reply is ok!\n");
+                    println!("{}\n", from_utf8(&incoming_msg).unwrap());
+                } else {
+                    println!("Unexpected reply");
                 }
             },
             Err(e) => {

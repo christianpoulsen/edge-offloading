@@ -1,7 +1,9 @@
 use std::{thread, time};
 use std::net::{TcpListener, TcpStream, Shutdown};
 use std::io::{Read, Write};
+use std::str::from_utf8;
 
+#[derive(Clone)]
 pub struct Server {
     addr: String,
     dur_secs: u64,
@@ -10,13 +12,18 @@ pub struct Server {
 
 impl Server {
 
-    pub fn new<'a>(addr: String, dur_secs: u64) -> Server {
-        let server = Server {
+    pub fn new(addr: String, dur_secs: u64) -> Server {
+        let server: Server = Server {
             addr,
             dur_secs,
             size: 1000,
         };
-        server.run();
+        let running_server = server.clone();
+
+        thread::spawn(move || {
+            running_server.run();
+        });
+        
         return server;
     }
 
@@ -48,8 +55,12 @@ impl Server {
         drop(listener);
     }
 
-    pub fn get_size(&self) -> &u64 {
-        return &self.size;
+    pub fn get_size(&self) -> u64 {
+        return self.size;
+    }
+
+    pub fn set_size(&mut self, size: u64) {
+        self.size = size;
     }
 
     pub fn get_addr(&self) -> &String {
@@ -82,10 +93,11 @@ fn busy_loop(sec: u64) {
 
 fn handle_client(mut stream: TcpStream, dur_sec: u64) {
     busy_loop(dur_sec);
-    let mut data = [0 as u8; 50]; // using 50 byte buffer
+    let mut data = [0; 512];
     while match stream.read(&mut data) {
         Ok(size) => {
             // echo everything!
+            // println!("2) Server msg: {:?}\n", from_utf8(&data[0..size]).unwrap());
             stream.write(&data[0..size]).unwrap();
             if size == 0 { false } else { true }
     },
