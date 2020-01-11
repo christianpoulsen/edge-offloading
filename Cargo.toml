@@ -1,9 +1,0 @@
-[package]
-name = "task-based-offloading"
-version = "0.1.0"
-authors = ["Christian Poulsen <cp@blackbird.online>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]

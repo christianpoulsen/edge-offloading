@@ -1,0 +1,11 @@
+[package]
+name = "client-based-offloading"
+version = "0.1.0"
+authors = ["Christian Poulsen <mail@christianpoulsen.dk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+rand = "0.3.14"
