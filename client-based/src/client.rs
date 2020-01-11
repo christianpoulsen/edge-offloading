@@ -100,29 +100,6 @@ impl<'client> Client<'client> {
                         },
                         Err(_) => println!("{}: Failed to clone stream", id),
                     }
-                    
-                // stream.write_all(self.buffer.as_mut()).unwrap();
-                // println!("Sent message, awaiting reply...");
-
-                // let mut incoming_msg: Vec<u8> = Vec::new();
-                // let mut data = [0; 512];
-                // while match stream.read(&mut data) {
-                //     Ok(size) => {
-                //         incoming_msg.extend_from_slice(&data[0..size]);
-                //         if size < 512 { false } else { true }
-                //     },
-                //     Err(e) => {
-                //         println!("Failed to receive data: {}", e);
-                //         false
-                //     }
-                // } { }
-                // if incoming_msg.as_slice().eq_ignore_ascii_case(&self.msg) {
-                //     println!("Reply is ok!\n");
-                //     println!("{}\n", from_utf8(&incoming_msg).unwrap());
-                // } else {
-                //     println!("Unexpected reply");
-                // }
-
                 },
                 Err(e) => {
                     println!("Failed to connect: {}", e);
