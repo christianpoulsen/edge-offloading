@@ -64,42 +64,42 @@ impl Controller {
         for stream in listener.incoming() {
 
             match stream {
-                Ok(stream) => {
+                Ok(mut stream) => {
                     println!("Controller: New connection: {}", stream.peer_addr().unwrap());
 
-                    if self.connections.len() > 0 {
-                        let mut connections_to_remove: Vec<Connection> = Vec::new();
-                        for i in 0..self.connections.len() {
-                            let running = Arc::clone(self.connections[i].get_running());
+                    // if self.connections.len() > 0 {
+                    //     let mut connections_to_remove: Vec<Connection> = Vec::new();
+                    //     for i in 0..self.connections.len() {
+                    //         let running = Arc::clone(self.connections[i].get_running());
 
-                            if !running.load(Ordering::Relaxed) {
-                                self.update_server_size(self.connections[i].server_index, self.connections[i].task_size, |x,y| x+y);
-                                connections_to_remove.push(self.connections[i].clone());
-                            }
-                        }
-                        self.connections.retain(|con| !connections_to_remove.contains(&con));
-                    }
+                    //         if !running.load(Ordering::Relaxed) {
+                    //             self.update_server_size(self.connections[i].server_index, self.connections[i].task_size, |x,y| x+y);
+                    //             connections_to_remove.push(self.connections[i].clone());
+                    //         }
+                    //     }
+                    //     self.connections.retain(|con| !connections_to_remove.contains(&con));
+                    // }
 
-                    let task_size = read_task_size(&stream);
-
-                    match task_size {
+                    match read_task_size(&stream) {
                         Ok(size) => {
-                            let server_index = self.find_or_create_server(size);
-                            let server_addr = self.get_server_addr(server_index);
-                            self.update_server_size(server_index, size, |x,y| x-y);
-                            let new_connection = Connection {
-                                running: Arc::new(AtomicBool::new(true)),
-                                task_size: size,
-                                server_addr: server_addr.clone(),
-                                server_index,
-                            };
-                            let running = Arc::clone(new_connection.get_running());
-                            self.connections.push(new_connection);
-                            println!("Spawning thread that handles connection with address: {}", server_addr);
+                            // let server_index = self.find_or_create_server(size);
+                            // let server_addr = self.get_server_addr(server_index);
+                            // self.update_server_size(server_index, size, |x,y| x-y);
+                            // let new_connection = Connection {
+                            //     running: Arc::new(AtomicBool::new(true)),
+                            //     task_size: size,
+                            //     server_addr: server_addr.clone(),
+                            //     server_index,
+                            // };
+                            // let running = Arc::clone(new_connection.get_running());
+                            // self.connections.push(new_connection);
+                            // println!("Spawning thread that handles connection with address: {}", server_addr);
                             
-                            thread::spawn(move || {
-                                connect_to_free_server(stream, server_addr.as_str(), running);
-                            });                            
+                            // thread::spawn(move || {
+                            //     connect_to_free_server(stream, server_addr.as_str(), running);
+                            // });
+                            
+                            stream.write("0.0.0.0:3334".as_bytes()).unwrap();
                         },
                         Err(_) => println!("Couldn't read the size of the task"),
                     }
