@@ -88,10 +88,11 @@ impl<'client> Client<'client> {
 
         match server_address.parse::<SocketAddrV4>() {
             Ok(address) => {
-                println!("Connecting to server at: {}", address);
 
+                println!("Connecting to server at: {}", address);
                 match TcpStream::connect(address) {
                     Ok(mut server_stream) => {
+
                         println!("Sending message to server");
                         server_stream.write_all(&msg).unwrap();
 
@@ -117,13 +118,13 @@ impl<'client> Client<'client> {
                         println!("Failed to connect to server: {}", e);
                     }
                 }
-
             },
             Err(_) => println!("Failed to parse ipv4 address: {}", server_address)
         }
 
         let mut server_update = Vec::new();
         server_update.extend_from_slice(&size_buffer);
+        println!("{:?}", server_address.as_bytes());
         server_update.extend_from_slice(server_address.as_bytes());
 
         println!("Connecting to controller again at: {}", controller_addr);

@@ -79,54 +79,51 @@ impl Controller {
                     //     self.connections.retain(|con| !connections_to_remove.contains(&con));
                     // }
 
-                    let mut task_size = 0;
-                    let mut server_index = 0;
-                    let mut server_addr_to_connect = String::new();
-                    println!("{:?}", stream);
+                    let mut peek_buffer = [0; 64];
+                    let total_size = stream.peek(&mut peek_buffer).unwrap();
 
-                    match read_task_size(&stream) {
-                        Ok(size) => {
-                            server_index = self.find_or_create_server(size);
-                            println!("Got server index");
-                            server_addr_to_connect = self.get_server_addr(server_index);
-                            println!("Got server address to connect to");
-                            self.update_server_size(server_index, size, |x,y| x-y);
-                            println!("Updated server size");
-                            task_size = size;
-                            
-                        },
-                        Err(_) => println!("Couldn't read the size of the task"),
-                    }
-                    let mut buffer2 = [0; 8];
-                    println!(">>> {:?}", &stream.read(&mut buffer2).unwrap());
-                    println!("hmmm");
-
-                    let mut server_addr_to_update = "";
-
-                    let mut buffer = [0; 8];
-                    match &stream.read(&mut buffer) {
-                        Ok(_) => {
-                            println!("Address follows task size!");
-                            let address = from_utf8(&buffer[0..8]).unwrap();
-                            match address.parse::<SocketAddrV4>() {
-                                Ok(_) => {
-                                    println!("Address is parseble");
-                                    server_addr_to_update = address.clone();
-                                },
-                                Err(_) => {
-                                    println!("Couldn't parse incoming server address");
+                    if total_size > 8 {
+                        match read_task_size(&stream) {
+                            Ok(size) => {
+                                let mut server_addr_to_update = "";
+                                let mut buffer = [0; 56];
+                                match stream.read(&mut buffer) {
+                                    Ok(addr_size) => {
+                                        let address = from_utf8(&buffer[0..addr_size]).unwrap();
+                                        match address.parse::<SocketAddrV4>() {
+                                            Ok(_) => {
+                                                println!("Address is parseble");
+                                                server_addr_to_update = address.clone();
+                                            },
+                                            Err(_) => {
+                                                println!("Couldn't parse incoming server address");
+                                            }
+                                        }
+                                        if !server_addr_to_update.is_empty() {
+                                            println!("Updating server");
+                                            self.update_server_size(String::from(server_addr_to_update), size, |x,y| x+y);
+                                        }
+                                    },
+                                    Err(e) => {
+                                        println!("Couldn't read the rest: {}", e);
+                                    }
                                 }
-                            }
-                            if !server_addr_to_update.is_empty() {
-                                println!("Updating server");
-                                self.update_server_size(server_index, task_size, |x,y| x+y);
-                            } else {
+                            },
+                            Err(_) => {}
+                        }
+                    } else {
+                        match read_task_size(&stream) {
+                            Ok(size) => {
+                                let server_index = self.find_or_create_server(size);
+                                println!("Got server index");
+                                let server_addr_to_connect = self.get_server_addr(server_index);
+                                println!("Got server address to connect to");
+                                self.update_server_size(server_addr_to_connect.clone(), size, |x,y| x-y);
+
                                 println!("Resending server address to connect to");
                                 stream.write(server_addr_to_connect.as_bytes()).unwrap();
-                            }
-                        },
-                        Err(e) => {
-                            println!("Couldn't read the rest: {}", e);
+                            },
+                            Err(_) => println!("Couldn't read the size of the task"),
                         }
                     }
                 }
@@ -173,7 +170,14 @@ impl Controller {
         return String::from(self.servers[index].get_addr());
     }
 
-    fn update_server_size(&mut self, index: usize, size: u64, update: fn(u64, u64) -> u64) {
+    fn update_server_size(&mut self, addr: String, size: u64, update: fn(u64, u64) -> u64) {
+        let mut index = 0;
+        for s in self.servers.iter() {
+            if *s.get_addr() == addr {
+                break
+            }
+            index += 1;
+        }
         let mut server = self.servers[index].clone();
         let current_size = &server.get_size();
         let new_size = update(*current_size, size);
