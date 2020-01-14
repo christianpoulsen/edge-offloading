@@ -62,15 +62,17 @@ impl<'client> Client<'client> {
             counter += 1;
         }
 
-        let mut data = [0; 512];
+        let mut buffer1 = [0; 512];
         let mut server_address: &str = "";
         
+        println!("Connecting to controller at: {}", controller_addr);
         match TcpStream::connect(&controller_addr) {
             Ok(mut controller_stream) => {
                 controller_stream.write(&size_buffer).unwrap();
-                match controller_stream.read(&mut data) {
+                match controller_stream.read(&mut buffer1) {
                     Ok(size) => {
-                        server_address = from_utf8(&data[0..size]).unwrap();
+                        println!("Got response from controller");
+                        server_address = from_utf8(&buffer1[0..size]).unwrap();
                     },
                     Err(e) => {
                         println!("Failed to receive data: {}", e);
@@ -82,18 +84,21 @@ impl<'client> Client<'client> {
             }
         }
 
+        let mut buffer2 = [0; 512];
+
         match server_address.parse::<SocketAddrV4>() {
             Ok(address) => {
                 println!("Connecting to server at: {}", address);
 
                 match TcpStream::connect(address) {
                     Ok(mut server_stream) => {
+                        println!("Sending message to server");
                         server_stream.write_all(&msg).unwrap();
 
                         let mut incoming_msg: Vec<u8> = Vec::new();
-                        while match server_stream.read(&mut data) {
+                        while match server_stream.read(&mut buffer2) {
                             Ok(size) => {
-                                incoming_msg.extend_from_slice(&data[0..size]);
+                                incoming_msg.extend_from_slice(&buffer2[0..size]);
                                 if size < 512 { false } else { true }
                             },
                             Err(e) => {
@@ -115,6 +120,20 @@ impl<'client> Client<'client> {
 
             },
             Err(_) => println!("Failed to parse ipv4 address: {}", server_address)
+        }
+
+        let mut server_update = Vec::new();
+        server_update.extend_from_slice(&size_buffer);
+        server_update.extend_from_slice(server_address.as_bytes());
+
+        println!("Connecting to controller again at: {}", controller_addr);
+        match TcpStream::connect(&controller_addr) {
+            Ok(mut controller_stream) => {
+                controller_stream.write(&server_update.as_slice()).unwrap();
+            },
+            Err(e) => {
+                println!("Failed to connect to controller: {}", e);
+            }
         }
 
         // let sleep_time = time::Duration::from_secs(3);

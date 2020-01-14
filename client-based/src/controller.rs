@@ -1,9 +1,9 @@
 use std::{thread};
-use std::net::{TcpListener, TcpStream, Shutdown};
+use std::net::{TcpListener, TcpStream, Shutdown, SocketAddrV4};
 use std::io::{Read, Write, Error};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-// use std::str::from_utf8;
+use std::str::from_utf8;
 
 use crate::helper;
 use crate::server::{Server};
@@ -66,7 +66,6 @@ impl Controller {
             match stream {
                 Ok(mut stream) => {
                     println!("Controller: New connection: {}", stream.peer_addr().unwrap());
-
                     // if self.connections.len() > 0 {
                     //     let mut connections_to_remove: Vec<Connection> = Vec::new();
                     //     for i in 0..self.connections.len() {
@@ -80,28 +79,55 @@ impl Controller {
                     //     self.connections.retain(|con| !connections_to_remove.contains(&con));
                     // }
 
+                    let mut task_size = 0;
+                    let mut server_index = 0;
+                    let mut server_addr_to_connect = String::new();
+                    println!("{:?}", stream);
+
                     match read_task_size(&stream) {
                         Ok(size) => {
-                            // let server_index = self.find_or_create_server(size);
-                            // let server_addr = self.get_server_addr(server_index);
-                            // self.update_server_size(server_index, size, |x,y| x-y);
-                            // let new_connection = Connection {
-                            //     running: Arc::new(AtomicBool::new(true)),
-                            //     task_size: size,
-                            //     server_addr: server_addr.clone(),
-                            //     server_index,
-                            // };
-                            // let running = Arc::clone(new_connection.get_running());
-                            // self.connections.push(new_connection);
-                            // println!("Spawning thread that handles connection with address: {}", server_addr);
+                            server_index = self.find_or_create_server(size);
+                            println!("Got server index");
+                            server_addr_to_connect = self.get_server_addr(server_index);
+                            println!("Got server address to connect to");
+                            self.update_server_size(server_index, size, |x,y| x-y);
+                            println!("Updated server size");
+                            task_size = size;
                             
-                            // thread::spawn(move || {
-                            //     connect_to_free_server(stream, server_addr.as_str(), running);
-                            // });
-                            
-                            stream.write("0.0.0.0:3334".as_bytes()).unwrap();
                         },
                         Err(_) => println!("Couldn't read the size of the task"),
+                    }
+                    let mut buffer2 = [0; 8];
+                    println!(">>> {:?}", &stream.read(&mut buffer2).unwrap());
+                    println!("hmmm");
+
+                    let mut server_addr_to_update = "";
+
+                    let mut buffer = [0; 8];
+                    match &stream.read(&mut buffer) {
+                        Ok(_) => {
+                            println!("Address follows task size!");
+                            let address = from_utf8(&buffer[0..8]).unwrap();
+                            match address.parse::<SocketAddrV4>() {
+                                Ok(_) => {
+                                    println!("Address is parseble");
+                                    server_addr_to_update = address.clone();
+                                },
+                                Err(_) => {
+                                    println!("Couldn't parse incoming server address");
+                                }
+                            }
+                            if !server_addr_to_update.is_empty() {
+                                println!("Updating server");
+                                self.update_server_size(server_index, task_size, |x,y| x+y);
+                            } else {
+                                println!("Resending server address to connect to");
+                                stream.write(server_addr_to_connect.as_bytes()).unwrap();
+                            }
+                        },
+                        Err(e) => {
+                            println!("Couldn't read the rest: {}", e);
+                        }
                     }
                 }
                 Err(e) => println!("Controller: Error: {}", e),
