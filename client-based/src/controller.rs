@@ -66,18 +66,6 @@ impl Controller {
             match stream {
                 Ok(mut stream) => {
                     println!("Controller: New connection: {}", stream.peer_addr().unwrap());
-                    // if self.connections.len() > 0 {
-                    //     let mut connections_to_remove: Vec<Connection> = Vec::new();
-                    //     for i in 0..self.connections.len() {
-                    //         let running = Arc::clone(self.connections[i].get_running());
-
-                    //         if !running.load(Ordering::Relaxed) {
-                    //             self.update_server_size(self.connections[i].server_index, self.connections[i].task_size, |x,y| x+y);
-                    //             connections_to_remove.push(self.connections[i].clone());
-                    //         }
-                    //     }
-                    //     self.connections.retain(|con| !connections_to_remove.contains(&con));
-                    // }
 
                     let mut peek_buffer = [0; 64];
                     let total_size = stream.peek(&mut peek_buffer).unwrap();
@@ -92,7 +80,6 @@ impl Controller {
                                         let address = from_utf8(&buffer[0..addr_size]).unwrap();
                                         match address.parse::<SocketAddrV4>() {
                                             Ok(_) => {
-                                                println!("Address is parseble");
                                                 server_addr_to_update = address.clone();
                                             },
                                             Err(_) => {
@@ -100,7 +87,6 @@ impl Controller {
                                             }
                                         }
                                         if !server_addr_to_update.is_empty() {
-                                            println!("Updating server");
                                             self.update_server_size(String::from(server_addr_to_update), size, |x,y| x+y);
                                         }
                                     },
@@ -115,13 +101,12 @@ impl Controller {
                         match read_task_size(&stream) {
                             Ok(size) => {
                                 let server_index = self.find_or_create_server(size);
-                                println!("Got server index");
                                 let server_addr_to_connect = self.get_server_addr(server_index);
-                                println!("Got server address to connect to");
                                 self.update_server_size(server_addr_to_connect.clone(), size, |x,y| x-y);
 
-                                println!("Resending server address to connect to");
-                                stream.write(server_addr_to_connect.as_bytes()).unwrap();
+                                thread::spawn(move || {
+                                    stream.write(server_addr_to_connect.as_bytes()).unwrap();
+                                });
                             },
                             Err(_) => println!("Couldn't read the size of the task"),
                         }
@@ -135,6 +120,7 @@ impl Controller {
     }
 
     fn find_or_create_server(&mut self, size: u64) -> usize {
+        println!("size {}", size);
         return match self.find_server(size) {
             Some(index) => index,
             None => self.create_server(),
@@ -142,10 +128,10 @@ impl Controller {
     }
 
     fn find_server(&self, size: u64) -> Option<usize> {
-        println!("Finding server...");
         let length = self.servers.len();
         for i in 0..length {
             if self.servers[i].get_size() >= size {
+                println!("index {}", i);
                 return Some(i);
             }
         }
