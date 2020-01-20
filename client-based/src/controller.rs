@@ -2,38 +2,17 @@ use std::{thread};
 use std::net::{TcpListener, TcpStream, Shutdown, SocketAddrV4};
 use std::io::{Read, Write, Error};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool};
 use std::str::from_utf8;
 
 use crate::helper;
 use crate::server::{Server};
-
-#[derive(Clone)]
-struct Connection {
-    running: Arc<AtomicBool>,
-    server_index: usize,
-    server_addr: String,
-    task_size: u64,
-}
-
-impl Connection {
-    pub fn get_running(&self) -> &Arc<AtomicBool> {
-        return &self.running
-    }
-}
-
-impl PartialEq for Connection {
-    fn eq(&self, other: &Self) -> bool {
-        self.server_addr == other.server_addr
-    }
-}
 
 pub struct Controller {
     port: i32,
     num_of_servers: i32,
     addr: String,
     servers: Vec<Server>,
-    connections: Vec<Connection>,
 }
 
 impl Controller {
@@ -47,7 +26,6 @@ impl Controller {
             num_of_servers,
             addr: helper::socket_addr("0.0.0.0:", init_port),
             servers: start_servers(init_port, num_of_servers),
-            connections: Vec::new(),
         };
         controller.run();
         return controller
@@ -214,67 +192,6 @@ fn read_task_size(mut client_stream: &TcpStream) -> Result<u64, Error> {
             println!("Controller: An error occurred, terminating connection with {}", client_stream.peer_addr().unwrap());
             client_stream.shutdown(Shutdown::Both).unwrap();
             panic!("Problem reading the task size: {}", e);
-        }
-    }
-}
-
-fn connect_to_free_server(client_stream: TcpStream, server_addr: &str, running: Arc<AtomicBool>) {
-
-    match TcpStream::connect(&server_addr) {
-        Ok(server_stream) => {
-            println!("Controller: Successfully connected to server at {}", server_addr);
-
-            pass_msg_from_client_to_server(client_stream, server_stream);
-        },
-        Err(e) => {
-            println!("Controller: Failed to connect: {}", e);
-        }
-    }
-
-    println!("Ending connection with server: {}", server_addr);
-    running.store(false, Ordering::Relaxed);
-}
-
-fn pass_msg_from_client_to_server(mut client_stream: TcpStream, mut server_stream: TcpStream) {
-    // read the message from the client
-    let mut client_data = [8; 512];
-    while match client_stream.read(&mut client_data) {
-        Ok(size) => {
-            let msg = &client_data[0..size];
-
-            // println!("1) pass_msg_from_client_to_server: {:?}\n", from_utf8(msg).unwrap());
-
-            // write the message to the server
-            server_stream.write_all(msg).unwrap();
-            
-            // continuing passing data as long, as there is more data to read
-            if size != 0 { 
-                pass_msg_from_server_to_client(&server_stream, &client_stream)
-            } else { 
-                false 
-            }
-        },
-        Err(_) => {
-            println!("Controller: An error occurred, terminating connection with {}", client_stream.peer_addr().unwrap());
-            client_stream.shutdown(Shutdown::Both).unwrap();
-            false
-        }
-    } { }
-}
-
-fn pass_msg_from_server_to_client(mut server_stream: &TcpStream, mut client_stream: &TcpStream) -> bool {
-    // read the message from the server
-    let mut server_data = [0; 512];
-    match server_stream.read(&mut server_data) {
-        Ok(size) => {
-            // println!("3) pass_msg_from_server_to_client: {:?}\n", from_utf8(&server_data[0..size]).unwrap());
-            // write the message from the server to the client
-            client_stream.write(&server_data[0..size]).unwrap();
-            true
-        },
-        Err(e) => {
-            println!("Controller: Failed to receive data: {}", e);
-            false
         }
     }
 }
