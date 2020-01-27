@@ -3,9 +3,9 @@ use std::{thread, time};
 use std::io::{Read, Write};
 use std::str::from_utf8;
 use rand::{Rng};
-use std::fs;
-use std::sync::{Arc, Mutex};
-use std::convert::TryInto;
+// use std::fs;
+// use std::sync::{Arc, Mutex};
+// use std::convert::TryInto;
 use ::time::{Instant};
 
 pub struct Client<'a> {
@@ -14,6 +14,12 @@ pub struct Client<'a> {
     // buffer: Vec<u8>,
     // msg: &'a [u8],
 }
+
+static DEBUG: bool = false;
+static LOG: bool = true;
+
+static SLEEP_TIME: u64 = 2;
+static TASK_SIZE: usize = 10; // TASK_SIZE * 10
 
 impl<'client> Client<'client> {
 
@@ -47,19 +53,20 @@ impl<'client> Client<'client> {
     }
 
     fn run(&mut self) {
-        println!("Starting client...");
+        if DEBUG { println!("Starting client...") };
+        if LOG { println!("latency") };
 
         let lorem_string = "0123456789"; 
         //b"LoremIpsum"; // dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit!";
 
-        let size_data: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
-        let time_data: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
+        // let size_data: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
+        // let time_data: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
 
-        let mut rerepeat = 0;
+        // let mut rerepeat = 0;
 
         let timer = Instant::now();
         
-        'the: loop {
+        while timer.elapsed().whole_minutes() < 10 {
 
             // let mut rng = thread_rng();
             // let size = rng.gen_range(50, lorem_string.len());
@@ -71,25 +78,6 @@ impl<'client> Client<'client> {
             let controller_addr = format!("{}:{}", self.connect_ipv4, self.connect_port);
             let id = rand::thread_rng().gen_ascii_chars().take(10).collect::<String>();
 
-            let repeat = (timer.elapsed().whole_milliseconds() * 10 - rerepeat).try_into().unwrap() ;
-
-            if repeat >= 2000000 {
-                rerepeat = 2000000;
-                let mut file = fs::OpenOptions::new().write(true).create(true).append(true).open("data.csv").unwrap();
-
-                let snani = size_data.lock().unwrap();
-                let tnani = time_data.lock().unwrap();
-                
-                let mut counter = 0;
-                for _ in snani.iter() {
-                    write!(file, "{},{}\n", snani[counter], tnani[counter]);
-                    counter += 1;
-                }
-            }
-            
-            let s_data = size_data.clone();
-            let t_data = time_data.clone();
-
             thread::spawn(move || {
 
                 let start = timer.elapsed().whole_microseconds();
@@ -98,7 +86,7 @@ impl<'client> Client<'client> {
                 let mut server_address: &str = "";
 
 
-                let temp = lorem_string.clone().repeat(repeat);
+                let temp = lorem_string.clone().repeat(TASK_SIZE);
                 let msg = temp.as_bytes();
 
                 let size = msg.len();
@@ -111,7 +99,7 @@ impl<'client> Client<'client> {
                     counter += 1;
                 }
             
-                println!("Connecting to controller at: {}", controller_addr);
+                if DEBUG { println!("Connecting to controller at: {}", controller_addr) };
                 match TcpStream::connect(&controller_addr) {
                     Ok(mut controller_stream) => {
                         controller_stream.write(&size_buffer).unwrap();
@@ -120,12 +108,12 @@ impl<'client> Client<'client> {
                                 server_address = from_utf8(&buffer1[0..size]).unwrap();
                             },
                             Err(e) => {
-                                println!("Failed to receive data: {}", e);
+                                if DEBUG { println!("Failed to receive data: {}", e) };
                             }
                         }
                     },
                     Err(e) => {
-                        println!("Failed to connect to controller: {}", e);
+                        if DEBUG { println!("Failed to connect to controller: {}", e) };
                     }
                 }
 
@@ -135,7 +123,7 @@ impl<'client> Client<'client> {
                     Ok(address) => {
                         
 
-                        println!("Connecting to server at: {}", address);
+                        if DEBUG { println!("Connecting to server at: {}", address) };
                         match TcpStream::connect(address) {
                             Ok(mut server_stream) => {
 
@@ -149,51 +137,47 @@ impl<'client> Client<'client> {
                                         if size < 512 { false } else { true }
                                     },
                                     Err(e) => {
-                                        println!("Failed to receive data: {}", e);
+                                        if DEBUG { println!("Failed to receive data: {}", e) };
                                         false
                                     }
                                 } { }
                                 if incoming_msg.as_slice().eq_ignore_ascii_case(&msg) {
-                                    println!("{} : Reply is ok!", id);
+                                    if DEBUG { println!("{} : Reply is ok!", id) };
                                     // println!("{}\n", from_utf8(&incoming_msg).unwrap());
                                 } else {
-                                    println!("{} : Unexpected reply!", id);
+                                    if DEBUG { println!("{} : Unexpected reply!", id) };
                                 }
                             },
                             Err(e) => {
-                                println!("Failed to connect to server: {}", e);
+                                if DEBUG { println!("Failed to connect to server: {}", e) };
                             }
                         }
                     },
-                    Err(_) => println!("Failed to parse ipv4 address: {}", server_address)
+                    Err(_) => if DEBUG { println!("Failed to parse ipv4 address: {}", server_address) },
                 }
 
                 let mut server_update = Vec::new();
                 server_update.extend_from_slice(&size_buffer);
                 server_update.extend_from_slice(server_address.as_bytes());
 
-                println!("Connecting to controller again at: {}", controller_addr);
+                // println!("Connecting to controller again at: {}", controller_addr);
                 match TcpStream::connect(&controller_addr) {
                     Ok(mut controller_stream) => {
                             controller_stream.write(&server_update.as_slice()).unwrap();
                     },
                     Err(e) => {
-                        println!("Failed to connect to controller: {}", e);
+                        if DEBUG { println!("Failed to connect to controller: {}", e) };
                     }
                 }
 
                 let end = timer.elapsed().whole_microseconds();
-                let duration = (end - start).try_into().unwrap();
+                let latency = end - start;
 
-                let mut sizes = s_data.lock().unwrap();
-                let mut times = t_data.lock().unwrap();
-
-                sizes.push(size);
-                times.push(duration);
+                if LOG { println!("{}", latency ) };
 
             });
 
-            let sleep_time = time::Duration::from_millis(1000);
+            let sleep_time = time::Duration::from_secs(SLEEP_TIME);
             thread::sleep(sleep_time);
         }
     }
