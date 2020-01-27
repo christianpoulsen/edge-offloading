@@ -16,7 +16,7 @@ impl Server {
         let server: Server = Server {
             addr,
             dur_secs,
-            size: 1000,
+            size: 2000000, // 2 Mb
         };
         let running_server = server.clone();
 

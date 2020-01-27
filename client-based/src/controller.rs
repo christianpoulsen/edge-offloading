@@ -1,8 +1,6 @@
 use std::{thread};
 use std::net::{TcpListener, TcpStream, Shutdown, SocketAddrV4};
 use std::io::{Read, Write, Error};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool};
 use std::str::from_utf8;
 
 use crate::helper;

@@ -10,6 +10,7 @@ use crate::server::{Server};
 use crate::controller::{Controller};
 use crate::client::{Client};
 
+extern crate time;
 extern crate rand;
 
 fn main() {
@@ -20,7 +21,7 @@ fn main() {
     } else if args[1] == "client" {
         Client::new();
     } else if args[1] == "server" {
-        Server::new("0.0.0.0:3333".to_owned(), 10);
+        Server::new("0.0.0.0:3333".to_owned(), 0);
     } else {
         println!("error");
     }

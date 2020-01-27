@@ -2,7 +2,11 @@ use std::net::{TcpStream,SocketAddrV4};
 use std::{thread, time};
 use std::io::{Read, Write};
 use std::str::from_utf8;
-use rand::{thread_rng, Rng};
+use rand::{Rng};
+use std::fs;
+use std::sync::{Arc, Mutex};
+use std::convert::TryInto;
+use ::time::{Instant};
 
 pub struct Client<'a> {
     connect_ipv4: &'a str,
@@ -15,22 +19,22 @@ impl<'client> Client<'client> {
 
     pub fn new<'a>() -> Client<'a> {
 
-        let lorem_string = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit!";
-        let mut size_buffer: [u8; 8] = [0; 8];
+        // let lorem_string = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit!";
+        // let mut size_buffer: [u8; 8] = [0; 8];
         
-        let mut rng = thread_rng();
-        let size = rng.gen_range(50, lorem_string.len());
-        let msg: &[u8] = &lorem_string[0..size];
+        // let mut rng = thread_rng();
+        // let size = 100; //rng.gen_range(50, lorem_string.len());
+        // let msg: &[u8] = &lorem_string[0..size];
         
-        let mut counter = 0;
-        for byte in size.to_be_bytes().iter() {
-            size_buffer[counter] = *byte;
-            counter += 1;
-        }
+        // let mut counter = 0;
+        // for byte in size.to_be_bytes().iter() {
+        //     size_buffer[counter] = *byte;
+        //     counter += 1;
+        // }
 
-        let mut buffer = Vec::new();
-        buffer.extend_from_slice(&size_buffer);
-        buffer.extend_from_slice(msg);
+        // let mut buffer = Vec::new();
+        // buffer.extend_from_slice(&size_buffer);
+        // buffer.extend_from_slice(msg);
 
         let mut client = Client {
             connect_ipv4: "0.0.0.0",
@@ -45,28 +49,67 @@ impl<'client> Client<'client> {
     fn run(&mut self) {
         println!("Starting client...");
 
-        let lorem_string = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit!";
-        let mut size_buffer: [u8; 8] = [0; 8];
+        let lorem_string = "0123456789"; 
+        //b"LoremIpsum"; // dolor sit amet, consectetur adipiscing elit. Maecenas laoreet hendrerit tempor. Donec ut tellus velit. Mauris egestas ac risus in volutpat. Quisque in purus id nisi tincidunt vehicula. Maecenas non nisi vitae risus congue rutrum ut et leo. Aliquam tincidunt, nunc sit amet aliquet gravida, elit elit sagittis risus, molestie porta lorem odio a sapien. Cras nec sollicitudin turpis, quis lacinia sapien. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed consequat id ipsum non aliquet. Proin eu lacus faucibus, elementum lorem et, mattis justo. Aliquam eu nisl velit!";
 
+        let size_data: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
+        let time_data: Arc<Mutex<Vec<usize>>> = Arc::new(Mutex::new(Vec::new()));
+
+        let mut rerepeat = 0;
+
+        let timer = Instant::now();
         
-        let mut rng = thread_rng();
-        let size = rng.gen_range(50, lorem_string.len());
-        let msg: &[u8] = &lorem_string[0..size];
-        
-        let mut counter = 0;
-        for byte in size.to_be_bytes().iter() {
-            size_buffer[counter] = *byte;
-            counter += 1;
-        }
-        
-        loop {
+        'the: loop {
+
+            // let mut rng = thread_rng();
+            // let size = rng.gen_range(50, lorem_string.len());
+            // let msg = lorem_string.repeat(10).as_bytes();
+            // let msg: &[u8] = lorem_string.repeat(10).as_bytes();//&lorem_string[0..size];
+            
+            let mut size_buffer: [u8; 8] = [0; 8];
             
             let controller_addr = format!("{}:{}", self.connect_ipv4, self.connect_port);
             let id = rand::thread_rng().gen_ascii_chars().take(10).collect::<String>();
+
+            let repeat = (timer.elapsed().whole_milliseconds() * 10 - rerepeat).try_into().unwrap() ;
+
+            if repeat >= 2000000 {
+                rerepeat = 2000000;
+                let mut file = fs::OpenOptions::new().write(true).create(true).append(true).open("data.csv").unwrap();
+
+                let snani = size_data.lock().unwrap();
+                let tnani = time_data.lock().unwrap();
+                
+                let mut counter = 0;
+                for _ in snani.iter() {
+                    write!(file, "{},{}\n", snani[counter], tnani[counter]);
+                    counter += 1;
+                }
+            }
             
+            let s_data = size_data.clone();
+            let t_data = time_data.clone();
+
             thread::spawn(move || {
+
+                let start = timer.elapsed().whole_microseconds();
+
                 let mut buffer1 = [0; 512];
                 let mut server_address: &str = "";
+
+
+                let temp = lorem_string.clone().repeat(repeat);
+                let msg = temp.as_bytes();
+
+                let size = msg.len();
+
+                // println!("repeat: {}; size: {}; msg: {:?}", repeat, size, msg);
+
+                let mut counter = 0;
+                for byte in size.to_be_bytes().iter() {
+                    size_buffer[counter] = *byte;
+                    counter += 1;
+                }
             
                 println!("Connecting to controller at: {}", controller_addr);
                 match TcpStream::connect(&controller_addr) {
@@ -90,10 +133,12 @@ impl<'client> Client<'client> {
 
                 match server_address.parse::<SocketAddrV4>() {
                     Ok(address) => {
+                        
 
                         println!("Connecting to server at: {}", address);
                         match TcpStream::connect(address) {
                             Ok(mut server_stream) => {
+
 
                                 server_stream.write_all(&msg).unwrap();
 
@@ -136,9 +181,19 @@ impl<'client> Client<'client> {
                         println!("Failed to connect to controller: {}", e);
                     }
                 }
+
+                let end = timer.elapsed().whole_microseconds();
+                let duration = (end - start).try_into().unwrap();
+
+                let mut sizes = s_data.lock().unwrap();
+                let mut times = t_data.lock().unwrap();
+
+                sizes.push(size);
+                times.push(duration);
+
             });
 
-            let sleep_time = time::Duration::from_secs(3);
+            let sleep_time = time::Duration::from_millis(1000);
             thread::sleep(sleep_time);
         }
     }
