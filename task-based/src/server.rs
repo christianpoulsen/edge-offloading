@@ -10,13 +10,15 @@ pub struct Server {
     size: u64,
 }
 
+static SERVER_CAPACITY: u64 = 2000;
+
 impl Server {
 
     pub fn new(addr: String, dur_secs: u64) -> Server {
         let server: Server = Server {
             addr,
             dur_secs,
-            size: 1000,
+            size: SERVER_CAPACITY,
         };
         let running_server = server.clone();
 

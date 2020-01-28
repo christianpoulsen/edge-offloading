@@ -18,8 +18,8 @@ pub struct Client<'a> {
 static DEBUG: bool = false;
 static LOG: bool = true;
 
-static SLEEP_TIME: u64 = 2;
-static TASK_SIZE: usize = 10; // TASK_SIZE * 10
+static SLEEP_TIME: u64 = 2; // 1 / SLEEP_TIME
+static TASK_SIZE: usize = 100; // TASK_SIZE * 10
 
 impl<'client> Client<'client> {
 

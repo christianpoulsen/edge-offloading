@@ -10,6 +10,7 @@ use crate::server::{Server};
 use crate::controller::{Controller};
 use crate::client::{Client};
 
+extern crate time;
 extern crate rand;
 
 fn main() {

@@ -28,6 +28,9 @@ impl PartialEq for Connection {
     }
 }
 
+static DEBUG: bool = true;
+static BUSY_TIME: u64 = 20;
+
 pub struct Controller {
     port: i32,
     num_of_servers: i32,
@@ -54,18 +57,18 @@ impl Controller {
     }
 
     pub fn run(&mut self) {
-        println!("Starting controller...");
+        if DEBUG { println!("Starting controller...") };
     
         // setup listener to connect to clients
         let listener = TcpListener::bind(self.addr.to_string()).unwrap();
 
         // accept connections and process them, spawning a new thread for each one
-        println!("Controller: Listening on {}", self.addr.to_string());
+        if DEBUG { println!("Controller: Listening on {}", self.addr.to_string()) };
         for stream in listener.incoming() {
 
             match stream {
                 Ok(stream) => {
-                    println!("Controller: New connection: {}", stream.peer_addr().unwrap());
+                    if DEBUG { println!("Controller: New connection: {}", stream.peer_addr().unwrap()) };
 
                     if self.connections.len() > 0 {
                         let mut connections_to_remove: Vec<Connection> = Vec::new();
@@ -95,16 +98,16 @@ impl Controller {
                             };
                             let running = Arc::clone(new_connection.get_running());
                             self.connections.push(new_connection);
-                            println!("Spawning thread that handles connection with address: {}", server_addr);
+                            if DEBUG { println!("Spawning thread that handles connection with address: {}", server_addr) };
                             
                             thread::spawn(move || {
                                 connect_to_free_server(stream, server_addr.as_str(), running);
                             });                            
                         },
-                        Err(_) => println!("Couldn't read the size of the task"),
+                        Err(_) => if DEBUG { println!("Couldn't read the size of the task") },
                     }
                 }
-                Err(e) => println!("Controller: Error: {}", e),
+                Err(e) => if DEBUG { println!("Controller: Error: {}", e) },
             }
         }
         // close the socket server
@@ -119,7 +122,7 @@ impl Controller {
     }
 
     fn find_server(&self, size: u64) -> Option<usize> {
-        println!("Finding server...");
+        if DEBUG { println!("Finding server...") };
         let length = self.servers.len();
         for i in 0..length {
             if self.servers[i].get_size() >= size {
@@ -131,11 +134,11 @@ impl Controller {
     }
 
     fn create_server(&mut self) -> usize {
-        println!("Creating new server");
+        if DEBUG { println!("Creating new server") };
         self.increment_port();
         let server_addr: String = helper::socket_addr("0.0.0.0:", self.port);
 
-        let server = Server::new(server_addr, 10);
+        let server = Server::new(server_addr, BUSY_TIME);
 
         self.increment_num_of_servers();
         self.servers.push(server);
@@ -167,9 +170,8 @@ impl Controller {
 
 fn start_servers<'a>(port: i32, num: i32) -> Vec<Server> {
 
-    println!("Controller: Starting the {} servers...", num);
+    if DEBUG { println!("Controller: Starting the {} servers...", num) };
     
-    let sec = 10;
     let mut servers: Vec<Server> = Vec::new();
 
     let mut port = port;
@@ -179,7 +181,7 @@ fn start_servers<'a>(port: i32, num: i32) -> Vec<Server> {
 
         let server_addr = helper::socket_addr("0.0.0.0:", port);
 
-        let server = Server::new(server_addr, sec);
+        let server = Server::new(server_addr, BUSY_TIME);
             
         servers.push(server);
     }
@@ -195,7 +197,7 @@ fn read_task_size(mut client_stream: &TcpStream) -> Result<u64, Error> {
             Ok(size)
         },
         Err(e) => {
-            println!("Controller: An error occurred, terminating connection with {}", client_stream.peer_addr().unwrap());
+            if DEBUG { println!("Controller: An error occurred, terminating connection with {}", client_stream.peer_addr().unwrap()) };
             client_stream.shutdown(Shutdown::Both).unwrap();
             panic!("Problem reading the task size: {}", e);
         }
@@ -206,16 +208,16 @@ fn connect_to_free_server(client_stream: TcpStream, server_addr: &str, running: 
 
     match TcpStream::connect(&server_addr) {
         Ok(server_stream) => {
-            println!("Controller: Successfully connected to server at {}", server_addr);
+            if DEBUG { println!("Controller: Successfully connected to server at {}", server_addr) };
 
             pass_msg_from_client_to_server(client_stream, server_stream);
         },
         Err(e) => {
-            println!("Controller: Failed to connect: {}", e);
+            if DEBUG { println!("Controller: Failed to connect: {}", e) };
         }
     }
 
-    println!("Ending connection with server: {}", server_addr);
+    if DEBUG { println!("Ending connection with server: {}", server_addr) };
     running.store(false, Ordering::Relaxed);
 }
 
@@ -239,7 +241,7 @@ fn pass_msg_from_client_to_server(mut client_stream: TcpStream, mut server_strea
             }
         },
         Err(_) => {
-            println!("Controller: An error occurred, terminating connection with {}", client_stream.peer_addr().unwrap());
+            if DEBUG { println!("Controller: An error occurred, terminating connection with {}", client_stream.peer_addr().unwrap()) };
             client_stream.shutdown(Shutdown::Both).unwrap();
             false
         }
@@ -257,7 +259,7 @@ fn pass_msg_from_server_to_client(mut server_stream: &TcpStream, mut client_stre
             true
         },
         Err(e) => {
-            println!("Controller: Failed to receive data: {}", e);
+            if DEBUG { println!("Controller: Failed to receive data: {}", e) };
             false
         }
     }
